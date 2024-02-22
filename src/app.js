@@ -1,8 +1,13 @@
 // const User=require("./src/models/users")
-const express = require('express')
-const Users= require("./models/users")
-const cors=require("cors")
-require("./db/connectDB")
+const express = require('express');
+const Users= require("./models/users");
+const cors=require("cors");
+const cookieParser =require("cookie-parser");
+
+// import dotenv from 'dotenv'
+// dotenv.config()
+require('dotenv').config();
+require("./db/connectDB");
 const nodemailer = require("nodemailer");
 const randomstring = require('randomstring');
 
@@ -11,17 +16,19 @@ const mongoose = require("mongoose");
 const otps = {};
 
 
-const app = express()
-const port = 3001
+const app = express();
+app.use(cookieParser());
+
+const port = process.env.PORT || 3002
 app.use(express.json());
-app.use(cors())
+app.use(cors());
 
 const transporter = nodemailer.createTransport({
     service:'gmail',
      auth: {
        // TODO: replace `user` and `pass` values from <https://forwardemail.net>
-       user: "stkbantai1@gmail.com",
-       pass: "nrtq aats jkdh rkoy",
+       user: process.env.MYEMAIL,
+       pass: process.env.MYPASS,
      },
    });
 
@@ -29,7 +36,7 @@ const transporter = nodemailer.createTransport({
 app.post('/form', async(req, res) => {
     try {
      const {Fname, Lname, Email, Phone, Password, CPassword, City, Otp} =req.body;
-     console.log(typeof(Otp),typeof(otps[Email]))
+     console.log(typeof(Otp),typeof(otps[Email]));
      if(Otp===otps[Email]){
           delete otps[Email];
          const User = new Users({
@@ -41,23 +48,63 @@ app.post('/form', async(req, res) => {
               City:City,
               Email:Email,
               Phone:Phone
-          })
+          });
+          const token= await User.generateAuthToken();
+console.log(token);
+// if we want to direct access (mean withouth login use ) below code
+// res.cookie("jwt",token,{
+//      expires:new Date(Date.now()+500000),
+//      httpOnly:true
+// });
           const created= await User.save();
-          console.log("one")
-          res.send("success")
+          console.log("one");
+          res.send("success");
      }else{
-          res.send("invalid")
+          res.send("invalid");
      }
 
     } catch (error) {
          console.log("done"+error);
-         res.send("hello")       
+         res.send("hello") ;
     }
    
-    })
+    });
+    app.post('/log', async(req, res)=>{
+      try{
+        const {Pass_word, Username}=req.body;
+        console.log('comelogin');
+      const UserO= await Users.findOne({Email:Username});
+
+      const UserOobj= await Users.find({Email:Username});
+      const {Email,Password}=UserOobj[0];
+console.log(Email, Password)
+if(Pass_word===Password){
+  console.log('match');
+
+  const token= await UserO.generateAuthToken();
+   res.cookie("jwt",token,{
+     expires:new Date(Date.now()+50000),
+        httpOnly:true });
+res.send("success");
+}else
+{ 
+  console.log('not match');
+
+  res.send("not match");
+}
+}catch(error){
+  console.log(error)
+ res.send("invailid");
+}
+
+
+    });
+
+
 app.post('/otp', async(req, res) => {
       const {Email}=req.body;
-      const otp = randomstring.generate({ length: 6, charset: 'numeric' });
+      // const otp = randomstring.generate({ length: 6, charset: 'numeric' }); online
+      const otp = 1;
       otps[Email]=otp;
     console.log(Email);
         var option ={
