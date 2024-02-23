@@ -69,28 +69,38 @@ console.log(token);
     }
    
     });
-    app.post('/log', async(req, res)=>{
+app.post('/log', async(req, res)=>{
       try{
-        const {Pass_word, Username}=req.body;
+        console.log(req.body)
+        const {Username,Pass_word,}=req.body;
+        console.log("u "+Username+"ps"+Pass_word)
+
         console.log('comelogin');
       const UserO= await Users.findOne({Email:Username});
 
       const UserOobj= await Users.find({Email:Username});
-      const {Email,Password}=UserOobj[0];
+      console.log("obj"+UserOobj)
+      const {Fname, Lname, Email, Phone,Password, City}=UserOobj[0];
+      const userdata={Fname, Lname, Email, Phone, City};
+      // console.log("stk"+stk.Email,stk.Password);
+      // console.log("[0]"+UserOobj[0])
 console.log(Email, Password)
 if(Pass_word===Password){
   console.log('match');
 
   const token= await UserO.generateAuthToken();
    res.cookie("jwt",token,{
-     expires:new Date(Date.now()+50000),
+     expires:new Date(Date.now()+500000),
         httpOnly:true });
-res.send("success");
+        res.statusMessage='success';
+        res.send(userdata);
+        // res.send("ok").statusMessage("done");
 }else
 { 
   console.log('not match');
 
-  res.send("not match");
+
+   res.send("not match");
 }
 }catch(error){
   console.log(error)
@@ -99,6 +109,29 @@ res.send("success");
 
 
     });
+// app.post('/auth', async(req,res)=>{
+//   try {
+//     const token=req.cookies.jwt;
+//     if(token){
+
+//     const verifyUser=jwt.verify(token,"Shakib");
+//     console.log(verifyUser);
+//     const user=await Users.findOne({_id:verifyUser._id})
+//     // console.log(user.fname)
+//     res.send(user)
+//     }else{
+//       console.log("not found")
+//       res.status(401).send("false")
+//     }
+ 
+    
+// } catch (error) {
+//    console.log(error)
+//    res.send("false")
+    
+// }
+
+// })
 
 
 app.post('/otp', async(req, res) => {
