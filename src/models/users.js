@@ -1,5 +1,5 @@
 const  mongoose  = require("mongoose");
-// require("../db/connectDB")
+require("../db/connectDB")
 const jwt =require("jsonwebtoken");
 
 const userSchegma= new mongoose.Schema({
