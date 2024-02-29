@@ -29,13 +29,22 @@ const openai = new OpenAI({
 });
 
 const openFun=async(q)=>{
+  if(true){
+    const response = await openai.images.generate({
+      model: "dall-e-2",
+      prompt: q,
+      quality:"hd"
+      });
+      console.log(response.data[0].url);
+
+  }else{
 const chatCompletion = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [{"role": "user", "content": q,}],
     // max_tokens:100
   });
   console.log(chatCompletion.choices[0].message.content);
-  return chatCompletion.choices[0].message.content
+  return chatCompletion.choices[0].message.content}
 }
 
 app.get("/GET",(req,res)=>{
