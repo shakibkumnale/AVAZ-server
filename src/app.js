@@ -4,7 +4,7 @@ const express = require('express');
 const Users= require("./models/users");
 const cors=require("cors");
 const cookieParser =require("cookie-parser");
-
+var validator = require("email-validator");
 const app = express();
 
 
@@ -29,7 +29,7 @@ const openai = new OpenAI({
 });
 
 const openFun=async(q)=>{
-  if(true){
+  if(false){
     const response = await openai.images.generate({
       model: "dall-e-2",
       prompt: q,
@@ -96,7 +96,8 @@ const transporter = nodemailer.createTransport({
 
 
 app.post('/form', async(req, res) => {
-    try {
+    try { 
+      
      const {Fname, Lname, Email, Phone, Password, CPassword, City, Otp} =req.body;
      console.log(typeof(Otp),typeof(otps[Email]));
      if(Otp===otps[Email]){
@@ -194,6 +195,42 @@ if(Pass_word===Password){
 // }
 
 // })
+app.post('/feedback', async(req, res)=>{1
+   const {name,cemail,message}=req.body;
+   console.log(req.body);
+   console.log(cemail);
+   const flag=validator.validate(cemail);
+   console.log(validator.validate(cemail))
+   console.log(validator.validate("stkbantai5@gmli.com"))
+   console.log(validator.validate("stkbantai"))
+   console.log(validator.validate("stkbantai1@gmail.com"))
+
+
+   if(flag){
+   var feedback ={
+    from:`"${name}" <"${cemail}">`, // sender address
+    to: 'stkbantai1@gmail.com', // list of receivers
+    subject: name +" want to Contact",
+    html:`<h1>${message}</h1>`,
+  };
+  transporter.sendMail(feedback,function(error,info){
+    if(error){
+         console.log(error);
+         
+         res.send(error);
+    }else{
+      console.log('done');
+      console.log(cemail);
+         res.send(flag);
+    }
+
+
+
+})
+}else{
+  res.send(flag)
+}
+})
 
 
 app.post('/otp', async(req, res) => {
