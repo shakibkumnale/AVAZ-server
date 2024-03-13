@@ -4,11 +4,10 @@ const express = require('express');
 const Users= require("./models/users");
 const cors=require("cors");
 const cookieParser =require("cookie-parser");
-var validator = require("email-validator");
+const bcrypt=require('bcrypt')
 const app = express();
-
-
-
+const auth=require('./auth')
+const jwt =require("jsonwebtoken");
 
 
 
@@ -17,34 +16,25 @@ const app = express();
 
 // ओल्ड बाककेण्ड कोड स्टार्ट 
 
-
-
 const OpenAI = require("openai");
 // const cors=require("cors")
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
+
 const openai = new OpenAI({
-  apiKey:process.env.MYKEY
+  // apiKey:process.env.MYKEY
+  apiKey:"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"
 });
 
 const openFun=async(q)=>{
-  if(false){
-    const response = await openai.images.generate({
-      model: "dall-e-2",
-      prompt: q,
-      quality:"hd"
-      });
-      console.log(response.data[0].url);
-
-  }else{
 const chatCompletion = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [{"role": "user", "content": q,}],
     // max_tokens:100
   });
   console.log(chatCompletion.choices[0].message.content);
-  return chatCompletion.choices[0].message.content}
+  return chatCompletion.choices[0].message.content
 }
 
 app.get("/GET",(req,res)=>{
@@ -95,10 +85,38 @@ const transporter = nodemailer.createTransport({
    });
 
 
+app.post('/forgot',async(req,res)=>{
+
+  try {
+    const {Email,otp,pass,cpass}=req.body
+    const forgot= await Users.find({Email:Email}).count()
+    console.log(forgot);
+    if (forgot===1) {
+      console.log(forgot);
+      res.send("exist")
+    }
+    else{
+      res.send("not-exist")
+
+    }
+    
+
+
+
+    
+
+    // console.log(username);
+  } catch (error) {
+    console.log(error);
+    res.send(error)
+  }
+})
+
+
 app.post('/form', async(req, res) => {
-    try { 
-      
+    try {
      const {Fname, Lname, Email, Phone, Password, CPassword, City, Otp} =req.body;
+     console.log(Otp);
      console.log(typeof(Otp),typeof(otps[Email]));
      if(Otp===otps[Email]){
           delete otps[Email];
@@ -112,8 +130,8 @@ app.post('/form', async(req, res) => {
               Email:Email,
               Phone:Phone
           });
-          const token= await User.generateAuthToken();
-console.log(token);
+          // const token= await User.generateAuthToken();
+          // console.log(token);
 // if we want to direct access (mean withouth login use ) below code
 // res.cookie("jwt",token,{
 //      expires:new Date(Date.now()+500000),
@@ -125,39 +143,171 @@ console.log(token);
      }else{
           res.send("invalid");
      }
-
     } catch (error) {
          console.log("done"+error);
          res.send("hello") ;
     }
-   
     });
+
+
+
+app.post('/tokenAuth',auth,(req,res)=>{
+
+  try {
+      const userData=req.user
+      const cookie=req.token
+      const {Fname, Lname, Email, Phone, City,tokens}=userData;
+    const uData={Fname, Lname, Email, Phone, City}
+    // console.log(userData.token);
+    console.log(Object.keys(userData.tokens).length)
+
+    if (Object.keys(userData.tokens).length!=0) {
+      
+    const f=userData.tokens.filter((ele)=>{
+          // console.log(ele.token);
+          return ele.token===cookie
+      })
+      console.log(userData+" ..............app.js");
+      console.log(cookie+" ..............app.js");
+      console.log(f[0].token+"...........match");
+      console.log(f[0].token===cookie);
+
+      if (f[0].token===cookie) {
+        res.statusMessage="Authenticated"
+    res.send(uData)
+      } else {
+        res.statusMessage="Not-Authenticated"
+        res.send()
+
+      }
+    }
+    else{
+      console.log('token== empty in database');
+      res.send("Login again")
+    }
+
+  } catch (error) {
+    console.log(error);
+    res.send(error)
+  }
+})
+
+app.post('/feedback', async(req, res)=>{1
+  const {name,cemail,message}=req.body;
+  console.log(req.body);
+  console.log(cemail);
+  const flag=validator.validate(cemail);
+  console.log(validator.validate(cemail))
+  console.log(validator.validate("stkbantai5@gmli.com"))
+  console.log(validator.validate("stkbantai"))
+  console.log(validator.validate("stkbantai1@gmail.com"))
+
+
+  if(flag){
+  var feedback ={
+   from:`"${name}" <"${cemail}">`, // sender address
+   to: 'stkbantai1@gmail.com', // list of receivers
+   subject: name +" want to Contact",
+   html:`<h1>${message}</h1>`,
+ };
+ transporter.sendMail(feedback,function(error,info){
+   if(error){
+        console.log(error);
+
+        res.send(error);
+   }else{
+     console.log('done');
+     console.log(cemail);
+        res.send(flag);
+   }
+
+
+
+})
+}else{
+ res.send(flag)
+}
+})
+
+app.post('/logout',auth,async(req,res)=>{
+  try {
+    const userData=req.user
+      const cookie=req.token
+      console.log(userData,cookie,userData.tokens)
+      const f=userData.tokens.filter((ele)=>{
+        // console.log(ele.token);
+        return ele.token!=cookie
+    })
+    userData.tokens=f
+    await userData.save()
+    res.statusMessage="logout"
+    res.send()
+
+    
+    
+  } catch (error) {
+    console.log(error);
+    
+  }
+})
+
+
+
+app.post('/alllogout',auth,async(req,res)=>{
+  try {
+    const userData=req.user
+      const cookie=req.token
+      console.log(userData,cookie,userData.tokens)
+      
+    userData.tokens=[]
+    await userData.save()
+    res.statusMessage="alllogout"
+    res.send()
+
+    
+    
+  } catch (error) {
+    console.log(error);
+    
+  }
+})
 app.post('/log', async(req, res)=>{
       try{
-        console.log(req.body)
+        // console.log(req.body)
         const {Username,Pass_word,}=req.body;
         console.log("u "+Username+"ps"+Pass_word)
 
-        console.log('comelogin');
+        // console.log('comelogin');
       const UserO= await Users.findOne({Email:Username});
 
       const UserOobj= await Users.find({Email:Username});
-      console.log("obj"+UserOobj)
+      // console.log("obj"+UserOobj)
       const {Fname, Lname, Email, Phone,Password, City}=UserOobj[0];
       const userdata={Fname, Lname, Email, Phone, City};
       // console.log("stk"+stk.Email,stk.Password);
       // console.log("[0]"+UserOobj[0])
 console.log(Email, Password)
-if(Pass_word===Password){
+const HashPass=await bcrypt.compare(Pass_word,UserO.Password)
+console.log(HashPass);
+if(HashPass){
   console.log('match');
 
   const token= await UserO.generateAuthToken();
-   res.cookie("jwt",token,{
-     expires:new Date(Date.now()+500000),
-        httpOnly:true });
+  console.log(token);
+  const userdata={Fname, Lname, Email, Phone, City,token};
+
+
+  // const verifyTOKEN=jwt.verify(token,"Shakib")
+  // console.log("verification"+ verifyTOKEN._id);
+  //  res.cookie("jwt",token,{
+  //    expires:new Date(Date.now()+500000),
+  //       httpOnly:true });
+        // res.json({token:token})
         res.statusMessage='success';
+        // res.cookie('jwt',token)
         res.send(userdata);
         // res.send("ok").statusMessage("done");
+        // res.send(token)
 }else
 { 
   console.log('not match');
@@ -195,50 +345,66 @@ if(Pass_word===Password){
 // }
 
 // })
-app.post('/feedback', async(req, res)=>{1
-   const {name,cemail,message}=req.body;
-   console.log(req.body);
-   console.log(cemail);
-   const flag=validator.validate(cemail);
-   console.log(validator.validate(cemail))
-   console.log(validator.validate("stkbantai5@gmli.com"))
-   console.log(validator.validate("stkbantai"))
-   console.log(validator.validate("stkbantai1@gmail.com"))
+
+app.post('/forgotOTPAuth',async(req,res)=>{
+  
+  const {Email,otp}=req.body
+  try {
+    
+    if(otp===otps[Email]){
+      
+      console.log(otp,otps[Email]);
+      
+      
+      res.send("OTP-AUTHENTICATED")
+      delete otps[Email];
+  }
+  else if (otp!=otps[Email]){
+    console.log("wrog");
+    res.send("NOT-OTP-AUTHENTICATED")
 
 
-   if(flag){
-   var feedback ={
-    from:`"${name}" <"${cemail}">`, // sender address
-    to: 'stkbantai1@gmail.com', // list of receivers
-    subject: name +" want to Contact",
-    html:`<h1>${message}</h1>`,
-  };
-  transporter.sendMail(feedback,function(error,info){
-    if(error){
-         console.log(error);
-         
-         res.send(error);
-    }else{
-      console.log('done');
-      console.log(cemail);
-         res.send(flag);
-    }
+  }
 
-
-
-})
-}else{
-  res.send(flag)
+} catch (error) {
+  console.log(error);
+  // res.send(error)
 }
+  
 })
 
+app.put('/reset', async(req,res)=>{
+  try {
+    const {Email,password}=req.body
+    console.log(Email,password);
+    const passhash=await bcrypt.hash(password,10)
+console.log(passhash);
+    const Reset=await Users.updateOne({Email:Email},{$set:{Password:passhash}})
+    console.log(Reset.modifiedCount);
+    console.log(Reset);
+
+    res.send(Reset)
+  } catch (error) {
+    console.log(error);
+    res.send(error)
+  }
+  })
+
+// app.post('/reset',async(req,res)=>{
+// try {
+//   const Reset=await Users.
+// } catch (error) {
+//   console.log(error);
+// }
+// })
 
 app.post('/otp', async(req, res) => {
       const {Email}=req.body;
-      // const otp = randomstring.generate({ length: 6, charset: 'numeric' }); online
-      const otp = 1;
+      console.log(Email);
+      // const otp = randomstring.generate({ length: 6, charset: 'numeric' }); //online
+      const otp = "1";
       otps[Email]=otp;
-    console.log(Email);
+    console.log(otps[Email]);
         var option ={
           from: "stkbantai1@gmail.com", // sender address
           to: Email, // list of receivers
@@ -472,7 +638,7 @@ app.post('/otp', async(req, res) => {
         };
         transporter.sendMail(option,function(error,info){
           if(error){
-               console.log(error);
+              //  console.log(error);
                res.send(error);
           }else{
                res.send("done");

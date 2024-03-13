@@ -1,6 +1,7 @@
 const  mongoose  = require("mongoose");
 require("../db/connectDB")
 const jwt =require("jsonwebtoken");
+const bcrypt=require('bcrypt')
 
 const userSchegma= new mongoose.Schema({
 Fname:{
@@ -54,6 +55,23 @@ userSchegma.methods.generateAuthToken = async function(){
     }
 }
 
+
+
+//for hashing password:------------
+userSchegma.pre("save",async function(params){
+    if(this.isModified('Password')){
+    this.Password=await bcrypt.hash(this.Password,10)}
+params()
+
+})
+
+
+//for update pass word remaining
+// userSchegma.pre("updateOne",async function (next){
+//     this.Password=await bcrypt.hash(this.Password,10)
+
+// next()
+// })
 
 const User = new mongoose.model("User",userSchegma);
  module.exports= User;  
