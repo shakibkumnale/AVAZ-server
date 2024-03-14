@@ -24,7 +24,7 @@ app.use(express.urlencoded({extended:true}))
 
 const openai = new OpenAI({
   // apiKey:process.env.MYKEY
-  apiKey:"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"
+  apiKey:"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"
 });
 
 const openFun=async(q)=>{
@@ -41,10 +41,55 @@ app.get("/GET",(req,res)=>{
   res.send("GET PAGE")
 })
 app.post("/POST",async(req,res)=>{
-    const res1=req.body
-    console.log(res1.query)
+     try {
+      
+       const {query,Email}=req.body
+      //  console.log(query)
+    console.log(req.body);
+    let answer=await openFun(query+"and give the title for this which wrap between *** ");
+    const startIndex = answer.indexOf('***') + 3;
+    console.log(answer);
+    const endIndex = answer.lastIndexOf('***');
+    
+    // Extract the text between start and end
+    const trimmedText = answer.substring(startIndex, endIndex);
+    
+    // Trim the remaining text
+    const title = trimmedText.trim();
+    let inputg = answer.split("");
+          
+          inputg.splice(0, (endIndex)+3);
+          inputg.pop();
+          const ans=inputg.join("").split(" ").join(" ")
+          // console.log(trimans ,(endIndex)+3,(endIndex));
+    
+    console.log('Trimmed:', title );   
+    
+    res.send( ans);
+       const user = await Users.findOne({Email:Email});
 
-    res.send( await openFun(res1.query))
+       if (!user) {
+        //  return res.status(404).json({ message: 'User not found' });
+        console.log("user not found");
+       }
+   
+       // Add the new chat object to the chats array
+       user.chats.push({ title, query, ans });
+   
+       // Save the updated user document
+       await user.save();
+       
+     
+   console.log('done sav');
+      //  res.status(200).json({ message: 'Chat history updated successfully' });
+
+       
+     } catch (error) {
+    // res.status(500).json({ message: 'Failed to update chat history' });
+    console.log(error);
+      
+     }
+   
 
 })
 app.get("/ai",async(req,res)=>{
@@ -322,6 +367,36 @@ if(HashPass){
 
 
     });
+// history apis start
+app.post('/history', async (req, res) => {
+  const { userId, query, answer } = req.body;
+
+  try {
+    // Find the user by userId
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Add the new chat object to the chats array
+    user.chats.push({ query, answer });
+
+    // Save the updated user document
+    await user.save();
+
+    res.status(200).json({ message: 'Chat history updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Failed to update chat history' });
+  }
+});
+
+
+// history apis eend
+
+
+
 // app.post('/auth', async(req,res)=>{
 //   try {
 //     const token=req.cookies.jwt;

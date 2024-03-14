@@ -32,7 +32,14 @@ Email:{ type:String,
 Phone:{ type:String,
     required:true,
     unique:true
-},
+},chats: [
+    { 
+      title: String,
+      query: String,
+      ans: String
+    }
+  ]
+,
 tokens:[{
     token:{
     type:String
