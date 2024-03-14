@@ -24,7 +24,7 @@ app.use(express.urlencoded({extended:true}))
 
 const openai = new OpenAI({
   // apiKey:process.env.MYKEY
-  apiKey:"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"
+  apiKey:"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"
 });
 
 const openFun=async(q)=>{
@@ -47,6 +47,7 @@ app.post("/POST",async(req,res)=>{
       //  console.log(query)
     console.log(req.body);
     let answer=await openFun(query+"and give the title for this which wrap between *** ");
+    if(answer.includes("***")){
     const startIndex = answer.indexOf('***') + 3;
     console.log(answer);
     const endIndex = answer.lastIndexOf('***');
@@ -60,12 +61,19 @@ app.post("/POST",async(req,res)=>{
           
           inputg.splice(0, (endIndex)+3);
           inputg.pop();
-          const ans=inputg.join("").split(" ").join(" ")
+          let ans=inputg.join("").split(" ").join(" ")
           // console.log(trimans ,(endIndex)+3,(endIndex));
     
     console.log('Trimmed:', title );   
-    
-    res.send( ans);
+    console.log(ans)
+    if(ans===""){
+      ans=title
+      res.send(ans);
+    }
+    else{
+    res.send(ans);
+
+    }
        const user = await Users.findOne({Email:Email});
 
        if (!user) {
@@ -81,6 +89,48 @@ app.post("/POST",async(req,res)=>{
        
      
    console.log('done sav');
+      } else if(answer.includes("**")){
+        const startIndex = answer.indexOf('**') + 2;
+    console.log(answer);
+    const endIndex = answer.lastIndexOf('**');
+    
+    // Extract the text between start and end
+    const trimmedText = answer.substring(startIndex, endIndex);
+    
+    // Trim the remaining text
+    const title = trimmedText.trim();
+    let inputg = answer.split("");
+          
+          inputg.splice(0, (endIndex)+2);
+          inputg.pop();
+          const ans=inputg.join("").split(" ").join(" ")
+          // console.log(trimans ,(endIndex)+3,(endIndex));
+    
+    console.log('Trimmed:', title );   
+    console.log(ans)
+    if(ans===""){
+      ans=title
+      res.send(ans);
+      
+  }
+    else{
+    res.send(ans);
+
+    }
+       const user = await Users.findOne({Email:Email});
+
+       if (!user) {
+        //  return res.status(404).json({ message: 'User not found' });
+        console.log("user not found");
+       }
+   
+       // Add the new chat object to the chats array
+       user.chats.push({ title, query, ans });
+   
+       // Save the updated user document
+       await user.save();
+       
+      }
       //  res.status(200).json({ message: 'Chat history updated successfully' });
 
        
