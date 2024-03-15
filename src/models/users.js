@@ -34,9 +34,8 @@ Phone:{ type:String,
     unique:true
 },chats: [
     { 
-      title: String,
       query: String,
-      ans: String
+      answer: String
     }
   ]
 ,

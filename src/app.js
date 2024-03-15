@@ -24,7 +24,7 @@ app.use(express.urlencoded({extended:true}))
 
 const openai = new OpenAI({
   // apiKey:process.env.MYKEY
-  apiKey:"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"
+  apiKey:"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"
 });
 
 const openFun=async(q)=>{
@@ -40,108 +40,45 @@ const chatCompletion = await openai.chat.completions.create({
 app.get("/GET",(req,res)=>{
   res.send("GET PAGE")
 })
+// my new code
 app.post("/POST",async(req,res)=>{
-     try {
-      
-       const {query,Email}=req.body
-      //  console.log(query)
-    console.log(req.body);
-    let answer=await openFun(query+"and give the title for this which wrap between *** ");
-    if(answer.includes("***")){
-    const startIndex = answer.indexOf('***') + 3;
-    console.log(answer);
-    const endIndex = answer.lastIndexOf('***');
-    
-    // Extract the text between start and end
-    const trimmedText = answer.substring(startIndex, endIndex);
-    
-    // Trim the remaining text
-    const title = trimmedText.trim();
-    let inputg = answer.split("");
-          
-          inputg.splice(0, (endIndex)+3);
-          inputg.pop();
-          let ans=inputg.join("").split(" ").join(" ")
-          // console.log(trimans ,(endIndex)+3,(endIndex));
-    
-    console.log('Trimmed:', title );   
-    console.log(ans)
-    if(ans===""){
-      ans=title
-      res.send(ans);
-    }
-    else{
-    res.send(ans);
+  try {
 
-    }
-       const user = await Users.findOne({Email:Email});
-
-       if (!user) {
-        //  return res.status(404).json({ message: 'User not found' });
-        console.log("user not found");
-       }
-   
-       // Add the new chat object to the chats array
-       user.chats.push({ title, query, ans });
-   
-       // Save the updated user document
-       await user.save();
-       
-     
-   console.log('done sav');
-      } else if(answer.includes("**")){
-        const startIndex = answer.indexOf('**') + 2;
+    const {query,Email}=req.body
+   //  console.log(query)
+ console.log(req.body);
+ const user = await Users.findOne({Email:Email})
+ let answer=await openFun(query);
+    if (!user) {
+     //  return res.status(404).json({ message: 'User not found' });
+     res.send(answer+" history not save");
+     console.log("user not found");
+    }else{
+    res.send(answer);
     console.log(answer);
-    const endIndex = answer.lastIndexOf('**');
-    
-    // Extract the text between start and end
-    const trimmedText = answer.substring(startIndex, endIndex);
-    
-    // Trim the remaining text
-    const title = trimmedText.trim();
-    let inputg = answer.split("");
-          
-          inputg.splice(0, (endIndex)+2);
-          inputg.pop();
-          const ans=inputg.join("").split(" ").join(" ")
-          // console.log(trimans ,(endIndex)+3,(endIndex));
-    
-    console.log('Trimmed:', title );   
-    console.log(ans)
-    if(ans===""){
-      ans=title
-      res.send(ans);
-      
+  
+    // Add the new chat object to the chats array
+    user.chats.push({query,answer});
+
+    // Save the updated user document
+    await user.save();
+
+
+console.log('done sav');
+   //  res.status(200).json({ message: 'Chat history updated successfully' });
+    }
+
+  } catch (error) {
+ // res.status(500).json({ message: 'Failed to update chat history' });
+ console.log(error);
+
   }
-    else{
-    res.send(ans);
-
-    }
-       const user = await Users.findOne({Email:Email});
-
-       if (!user) {
-        //  return res.status(404).json({ message: 'User not found' });
-        console.log("user not found");
-       }
-   
-       // Add the new chat object to the chats array
-       user.chats.push({ title, query, ans });
-   
-       // Save the updated user document
-       await user.save();
-       
-      }
-      //  res.status(200).json({ message: 'Chat history updated successfully' });
-
-       
-     } catch (error) {
-    // res.status(500).json({ message: 'Failed to update chat history' });
-    console.log(error);
-      
-     }
    
 
 })
+// my new code
+
+
 app.get("/ai",async(req,res)=>{
     // res.send( await openFun())
 })
