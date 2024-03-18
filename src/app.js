@@ -8,74 +8,160 @@ const bcrypt=require('bcrypt')
 const app = express();
 const auth=require('./auth')
 const jwt =require("jsonwebtoken");
-
-
-
-
-
-
-// ओल्ड बाककेण्ड कोड स्टार्ट 
-
 const OpenAI = require("openai");
+
 // const cors=require("cors")
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
 
-const openai = new OpenAI({
-  // apiKey:process.env.MYKEY
-  apiKey:"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"
-});
 
-const openFun=async(q)=>{
-const chatCompletion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{"role": "user", "content": q,}],
-    // max_tokens:100
+
+// new asistant code start
+const apiKey = process.env.OPENAI_API_KEY;
+const openai = new OpenAI(apiKey);
+
+let assistant_id;
+
+// Create an Assistant
+async function createAssistant() {
+  const assistantResponse = await openai.beta.assistants.create({
+    name: "AVAZ", // adjust name as per requirement
+    instructions: "your name is avaz ai voice assistant who assist user you developed by shakib and kammo for BSC IT final year project. there studing in nktt college which located in thane   ",
+    // tools: [{ type: "code_interpreter" }], // adjust tools as per requirement
+    model: "gpt-3.5-turbo-0125", // or any other GPT-3.5 or GPT-4 model
   });
-  console.log(chatCompletion.choices[0].message.content);
-  return chatCompletion.choices[0].message.content
+  assistant_id = assistantResponse.id;
+  console.log(`Assistant ID: ${assistant_id}`);
 }
 
-app.get("/GET",(req,res)=>{
-  res.send("GET PAGE")
-})
-// my new code
-app.post("/POST",async(req,res)=>{
+createAssistant();
+
+
+// Endpoint to handle chat
+app.post("/POST", async (req, res) => {
   try {
-
+    if (!req.body.query) {
+      return res.status(400).json({ error: "Message field is required" });
+    }
+    // const userMessage = req.body.query;
     const {query,Email}=req.body
-   //  console.log(query)
- console.log(req.body);
- const user = await Users.findOne({Email:Email})
- let answer=await openFun(query);
-    if (!user) {
-     //  return res.status(404).json({ message: 'User not found' });
-     res.send(answer+" history not save");
-     console.log("user not found");
-    }else{
-    res.send(answer);
-    console.log(answer);
-  
-    // Add the new chat object to the chats array
-    user.chats.push({query,answer});
 
-    // Save the updated user document
-    await user.save();
+    // Create a Thread
+    const threadResponse = await openai.beta.threads.create();
+    const threadId = threadResponse.id;
 
+    // Add a Message to a Thread
+    await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: query,
+    });
 
-console.log('done sav');
-   //  res.status(200).json({ message: 'Chat history updated successfully' });
+    // Run the Assistant
+    const runResponse = await openai.beta.threads.runs.create(threadId, {
+      assistant_id: assistant_id,
+    });
+
+    // Check the Run status
+    let run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
+    while (run.status !== "completed") {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
     }
 
-  } catch (error) {
- // res.status(500).json({ message: 'Failed to update chat history' });
- console.log(error);
+    // Display the Assistant's Response
+const messagesResponse = await openai.beta.threads.messages.list(threadId);
+const assistantResponses = messagesResponse.data.filter(msg => msg.role === 'assistant');
+const response = assistantResponses.map(msg => 
+  msg.content
+    .filter(contentItem => contentItem.type === 'text')
+    .map(textContent => textContent.text.value)
+    .join('\n')
+).join('\n');
+ const user = await Users.findOne({Email:Email})
 
+if (!user) {
+       //  return res.status(404).json({ message: 'User not found' });
+       res.send(response+" history not save");
+       console.log("user not found");
+      }else{
+          res.send(response)
+          let answer=response;
+          // Add the new chat object to the chats array
+            user.chats.push({query,answer});
+        
+            // Save the updated user document
+            await user.save();
+
+      }  
+          
+  } catch (error) {
+    console.error("Error processing chat:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
+});
+
+
+// new asistant code end
+
+
+// ओल्ड बाककेण्ड कोड स्टार्ट 
+
+// const OpenAI = require("openai");
+
+
+// const openai = new OpenAI({
+//   // apiKey:process.env.MYKEY
+//   apiKey:"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"
+// });
+
+// const openFun=async(q)=>{
+// const chatCompletion = await openai.chat.completions.create({
+//     model: "gpt-3.5-turbo",
+//     messages: [{"role": "user", "content": q,}],
+//     // max_tokens:100
+//   });
+//   console.log(chatCompletion.choices[0].message.content);
+//   return chatCompletion.choices[0].message.content
+// }
+
+
+// my new code
+// app.post("/POST",async(req,res)=>{
+//   try {
+
+//     const {query,Email}=req.body
+//    //  console.log(query)
+//  console.log(req.body);
+//  let answer=await openFun(query);
+//  const user = await Users.findOne({Email:Email})
+//     if (!user) {
+//      //  return res.status(404).json({ message: 'User not found' });
+//      res.send(answer+" history not save");
+//      console.log("user not found");
+//     }else{
+//     res.send(answer);
+//     console.log(answer);
+  
+//     // Add the new chat object to the chats array
+//     user.chats.push({query,answer});
+
+//     // Save the updated user document
+//     await user.save();
+
+
+// console.log('done sav');
+//    //  res.status(200).json({ message: 'Chat history updated successfully' });
+//     }
+
+//   } catch (error) {
+//  // res.status(500).json({ message: 'Failed to update chat history' });
+//  console.log(error);
+
+//   }
    
 
-})
+// })
 // my new code
 
 
@@ -355,27 +441,27 @@ if(HashPass){
 
     });
 // history apis start
-app.post('/history', async (req, res) => {
-  const { userId, query, answer } = req.body;
+app.post('/hi', async (req, res) => {
+  const { Email} = req.body;
 
   try {
     // Find the user by userId
-    const user = await User.findById(userId);
+    const user = await Users.findOne({Email:Email});
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     // Add the new chat object to the chats array
-    user.chats.push({ query, answer });
+res.send(user.chats)
 
     // Save the updated user document
-    await user.save();
+    // await user.save();
 
-    res.status(200).json({ message: 'Chat history updated successfully' });
+    // res.status(200).json({ message: 'Chat history updated successfully' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Failed to update chat history' });
+    res.status(500).json({ message: error});
   }
 });
 
