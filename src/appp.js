@@ -8,65 +8,163 @@ const bcrypt=require('bcrypt')
 const app = express();
 const auth=require('./auth')
 const jwt =require("jsonwebtoken");
-
-
-
-
-
-
-// ओल्ड बाककेण्ड कोड स्टार्ट 
-
 const OpenAI = require("openai");
+
 // const cors=require("cors")
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
 
-const openai = new OpenAI({
-  // apiKey:process.env.MYKEY
-  apiKey:process.env.OPENAI_API_KEY
+
+
+// new asistant code start
+const apiKey = process.env.OPENAI_API_KEY;
+const openai = new OpenAI(apiKey);
+
+let assistant_id;
+
+// Create an Assistant
+async function createAssistant() {
+  const assistantResponse = await openai.beta.assistants.create({
+    name: "AVAZ", // adjust name as per requirement
+    instructions: "your name is avaz ai voice assistant who assist user you developed by shakib and kamruddin for BSC IT final year project.  ",
+    // tools: [{ type: "code_interpreter" }], // adjust tools as per requirement
+    model: "gpt-3.5-turbo-0125", // or any other GPT-3.5 or GPT-4 model
+  });
+  assistant_id = assistantResponse.id;
+  console.log(`Assistant ID: ${assistant_id}`);
+}
+
+createAssistant();
+
+
+// Endpoint to handle chat
+app.post("/POST", async (req, res) => {
+  try {
+    if (!req.body.query) {
+      return res.status(400).json({ error: "Message field is required" });
+    }
+    // const userMessage = req.body.query;
+    const {query,Email}=req.body
+
+    // Create a Thread
+    const threadResponse = await openai.beta.threads.create();
+    const threadId = threadResponse.id;
+
+    // Add a Message to a Thread
+    await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: query,
+    });
+
+    // Run the Assistant
+    const runResponse = await openai.beta.threads.runs.create(threadId, {
+      assistant_id: assistant_id,
+    });
+
+    // Check the Run status
+    let run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
+    while (run.status !== "completed") {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
+    }
+
+    // Display the Assistant's Response
+const messagesResponse = await openai.beta.threads.messages.list(threadId);
+const assistantResponses = messagesResponse.data.filter(msg => msg.role === 'assistant');
+const response = assistantResponses.map(msg => 
+  msg.content
+    .filter(contentItem => contentItem.type === 'text')
+    .map(textContent => textContent.text.value)
+    .join('\n')
+).join('\n');
+ const user = await Users.findOne({Email:Email})
+
+if (!user) {
+       //  return res.status(404).json({ message: 'User not found' });
+       res.send(response+" history not save");
+       console.log("user not found");
+      }else{
+          res.send(response)
+          let answer=response;
+          // Add the new chat object to the chats array
+            user.chats.push({query,answer});
+        
+            // Save the updated user document
+            await user.save();
+
+      }  
+          
+  } catch (error) {
+    console.error("Error processing chat:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-const openFun=async(q)=>{
-const chatCompletion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{"role": "user", "content": q,}],
-    // max_tokens:100
-  });
-  console.log(chatCompletion.choices[0].message.content);
-  return chatCompletion.choices[0].message.content
-}
 
-app.get("/GET",(req,res)=>{
-  res.send("GET PAGE")
-})
-app.post("/POST",async(req,res)=>{
-    const {query,Emails}=req.body
-    console.log(query,Emails)
-try{
-  const response= await openFun(query)
-  const user = await Users.findOne({Email:Emails})
+// new asistant code end
 
-  if (!user) {
-         //  return res.status(404).json({ message: 'User not found' });
-         res.send(response+" history not save");
-         console.log("user not found");
-         console.log(response);
-        }else{
-          let answer=response;
-          res.send(answer)
-            // Add the new chat object to the chats array
-              user.chats.push({query,answer});
-          
-              // Save the updated user document
-              await user.save();
+
+// ओल्ड बाककेण्ड कोड स्टार्ट 
+
+// const OpenAI = require("openai");
+
+
+// const openai = new OpenAI({
+//   // apiKey:process.env.MYKEY
+//   apiKey:""
+// });
+
+// const openFun=async(q)=>{
+// const chatCompletion = await openai.chat.completions.create({
+//     model: "gpt-3.5-turbo",
+//     messages: [{"role": "user", "content": q,}],
+//     // max_tokens:100
+//   });
+//   console.log(chatCompletion.choices[0].message.content);
+//   return chatCompletion.choices[0].message.content
+// }
+
+
+// my new code
+// app.post("/POST",async(req,res)=>{
+//   try {
+
+//     const {query,Email}=req.body
+//    //  console.log(query)
+//  console.log(req.body);
+//  let answer=await openFun(query);
+//  const user = await Users.findOne({Email:Email})
+//     if (!user) {
+//      //  return res.status(404).json({ message: 'User not found' });
+//      res.send(answer+" history not save");
+//      console.log("user not found");
+//     }else{
+//     res.send(answer);
+//     console.log(answer);
   
-        }
-}catch(e){
-console.log(e);
-}
+//     // Add the new chat object to the chats array
+//     user.chats.push({query,answer});
 
-})
+//     // Save the updated user document
+//     await user.save();
+
+
+// console.log('done sav');
+//    //  res.status(200).json({ message: 'Chat history updated successfully' });
+//     }
+
+//   } catch (error) {
+//  // res.status(500).json({ message: 'Failed to update chat history' });
+//  console.log(error);
+
+//   }
+   
+
+// })
+// my new code
+
+
 app.get("/ai",async(req,res)=>{
     // res.send( await openFun())
 })
@@ -165,7 +263,7 @@ app.post('/form', async(req, res) => {
      }
     } catch (error) {
          console.log("done"+error);
-         res.send("hello") ;
+         res.send(error) ;
     }
     });
 
@@ -212,6 +310,38 @@ app.post('/tokenAuth',auth,(req,res)=>{
   }
 })
 
+app.post('/feedback', async(req, res)=>{1
+  const {name,cemail,message}=req.body;
+  console.log(req.body);
+  console.log(cemail);
+  
+
+
+  // if(flag){
+  var feedback ={
+   from:`"${name}" <"${cemail}">`, // sender address
+   to: 'Example@gmail.com', // list of receivers
+   subject: name +" want to Contact",
+   html:`<h1>${message}</h1>`,
+ };
+ transporter.sendMail(feedback,function(error,info){
+   if(error){
+        console.log(error);
+
+        res.send(error);
+   }else{
+     console.log('done');
+     console.log(cemail);
+        res.send(flag);
+   }
+
+
+
+})
+// }else{
+//  res.send(flag)
+// }
+})
 
 app.post('/logout',auth,async(req,res)=>{
   try {
@@ -306,32 +436,8 @@ if(HashPass){
 
 
     });
-// app.post('/auth', async(req,res)=>{
-//   try {
-//     const token=req.cookies.jwt;
-//     if(token){
-
-//     const verifyUser=jwt.verify(token,"Shakib");
-//     console.log(verifyUser);
-//     const user=await Users.findOne({_id:verifyUser._id})
-//     // console.log(user.fname)
-//     res.send(user)
-//     }else{
-//       console.log("not found")
-//       res.status(401).send("false")
-//     }
- 
-    
-// } catch (error) {
-//    console.log(error)
-//    res.send("false")
-    
-// }
-
-// })
-
 // history apis start
-app.post('/hi1', async (req, res) => {
+app.post('/hi', async (req, res) => {
   const { Email} = req.body;
 
   try {
@@ -355,43 +461,34 @@ res.send(user.chats)
   }
 });
 
-app.post('/feedback', async(req, res)=>{1
-  const {name,cemail,message}=req.body;
-  console.log(req.body);
-  console.log(cemail);
-  const flag=validator.validate(cemail);
-  console.log(validator.validate(cemail))
-  console.log(validator.validate("stkbantai5@gmli.com"))
-  console.log(validator.validate("stkbantai"))
-  console.log(validator.validate("stkbantai1@gmail.com"))
 
-
-  if(flag){
-  var feedback ={
-   from:`"${name}" <"${cemail}">`, // sender address
-   to: 'stkbantai1@gmail.com', // list of receivers
-   subject: name +" want to Contact",
-   html:`<h1>${message}</h1>`,
- };
- transporter.sendMail(feedback,function(error,info){
-   if(error){
-        console.log(error);
-
-        res.send(error);
-   }else{
-     console.log('done');
-     console.log(cemail);
-        res.send(flag);
-   }
+// history apis eend
 
 
 
-})
-}else{
- res.send(flag)
-}
-})
+// app.post('/auth', async(req,res)=>{
+//   try {
+//     const token=req.cookies.jwt;
+//     if(token){
 
+//     const verifyUser=jwt.verify(token,"Shakib");
+//     console.log(verifyUser);
+//     const user=await Users.findOne({_id:verifyUser._id})
+//     // console.log(user.fname)
+//     res.send(user)
+//     }else{
+//       console.log("not found")
+//       res.status(401).send("false")
+//     }
+ 
+    
+// } catch (error) {
+//    console.log(error)
+//    res.send("false")
+    
+// }
+
+// })
 
 app.post('/forgotOTPAuth',async(req,res)=>{
   
@@ -448,12 +545,12 @@ console.log(passhash);
 app.post('/otp', async(req, res) => {
       const {Email}=req.body;
       console.log(Email);
-      // const otp = randomstring.generate({ length: 6, charset: 'numeric' }); //online
-      const otp = "1";
+      const otp = randomstring.generate({ length: 6, charset: 'numeric' }); //online
+      // const otp = "1";
       otps[Email]=otp;
     console.log(otps[Email]);
         var option ={
-          from: "stkbantai1@gmail.com", // sender address
+          from: "Example@gmail.com", // sender address
           to: Email, // list of receivers
           subject: "Hello ✔", // Subject line
           // text: ` your otp is ${otp} `, // plain text body
@@ -596,7 +693,7 @@ app.post('/otp', async(req, res) => {
                  >
                    Need help? Ask at
                    <a
-                     href="mailto: stkbantai1@gmail.com"
+                     href="mailto: Example@gmail.com"
                      style="color: #499fb6; text-decoration: none;"
                      >AVAZ@gmail.com</a
                    >

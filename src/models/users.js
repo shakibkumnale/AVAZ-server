@@ -32,13 +32,13 @@ Email:{ type:String,
 Phone:{ type:String,
     required:true,
     unique:true
-},chats: [
+},
+chats: [
     { 
       query: String,
       answer: String
     }
-  ]
-,
+  ],
 tokens:[{
     token:{
     type:String
