@@ -8,76 +8,273 @@ const bcrypt=require('bcrypt')
 const app = express();
 const auth=require('./auth')
 const jwt =require("jsonwebtoken");
-const OpenAI = require("openai");
+const multer = require('multer');
+// const OpenAI = require("openai");
+const {
+  GoogleGenerativeAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} = require("@google/generative-ai");
+const { GoogleAIFileManager } = require("@google/generative-ai/files");
 
 // const cors=require("cors")
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
 
+const apiKey = process.env.GEMINI_API_KEY;
+
+const genAI = new GoogleGenerativeAI(apiKey);
+const fileManager = new GoogleAIFileManager(apiKey);
 
 
-// new asistant code start
-const apiKey = process.env.OPENAI_API_KEY;
-const openai = new OpenAI(apiKey);
-
-let assistant_id;
-
-// Create an Assistant
-async function createAssistant() {
-  const assistantResponse = await openai.beta.assistants.create({
-    name: "AVAZ", // adjust name as per requirement
-    instructions: "your name is avaz ai voice assistant who assist user you developed by shakib and kamruddin for BSC IT final year project.  ",
-    // tools: [{ type: "code_interpreter" }], // adjust tools as per requirement
-    model: "gpt-3.5-turbo-0125", // or any other GPT-3.5 or GPT-4 model
+const upload = multer({ dest: 'uploads/' });
+async function uploadToGemini(path, mimeType) {
+  const uploadResult = await fileManager.uploadFile(path, {
+    mimeType,
+    displayName: path,
   });
-  assistant_id = assistantResponse.id;
-  console.log(`Assistant ID: ${assistant_id}`);
+  const file = uploadResult.file;
+  return file;
 }
 
-createAssistant();
+/**
+ * Waits for the given file to be active.
+ */
+async function waitForFileActive(file) {
+  console.log("Waiting for file processing...");
+  let fileInfo = await fileManager.getFile(file.name);
+  while (fileInfo.state === "PROCESSING") {
+    process.stdout.write(".");
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+    fileInfo = await fileManager.getFile(file.name);
+  }
+  if (fileInfo.state !== "ACTIVE") {
+    throw new Error(`File ${file.name} failed to process`);
+  }
+  console.log("...file is ready\n");
+  return fileInfo;
+}
+
+/**
+ * Endpoint to handle file upload and proxy to Gemini.
+ */
+app.post('/upload', upload.single('video'), async (req, res) => {
+  try {
+    const file = await uploadToGemini(req.file.path, req.file.mimetype);
+    const activeFile = await waitForFileActive(file);
+    res.status(200).json({ fileUri: activeFile.uri });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.use(express.json());
+
+app.post('/ask', async (req, res) => {
+  const { fileUri, input } = req.body;
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+  });
+
+  const generationConfig = {
+    temperature: 1,
+    topP: 0.95,
+    topK: 64,
+    maxOutputTokens: 8192,
+    responseMimeType: "text/plain",
+  };
+
+  const safetySettings = [
+    {
+      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+  ];
+
+  const chatSession = model.startChat({
+    generationConfig,
+    safetySettings,
+    history: [
+      {
+        role: "user",
+        parts: [
+          {
+            fileData: {
+              mimeType: "video/mp4", // Adjust mimeType accordingly
+              fileUri: fileUri,
+            },
+          },
+          {
+            text: input,
+          },
+        ],
+      },
+    ],
+  });
+
+  try {
+    const result = await chatSession.sendMessage(input);
+    res.send( result.response.text() );
+    console.log(result.response.text());
+  } catch (error) {
+    console.error('Request:', { fileUri, input });
+    console.error('Error:', error.response ? error.response.data : error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+// end the video ask
+// new asistant code start
+// const apiKey = process.env.OPENAI_API_KEY;
+// const openai = new OpenAI(apiKey);
+
+// let assistant_id;
+
+// // Create an Assistant
+// async function createAssistant() {
+//   const assistantResponse = await openai.beta.assistants.create({
+//     name: "AVAZ", // adjust name as per requirement
+//     instructions: "your name is avaz ai voice assistant who assist user you developed by shakib and kamruddin for BSC IT final year project.  ",
+//     // tools: [{ type: "code_interpreter" }], // adjust tools as per requirement
+//     model: "gpt-3.5-turbo-0125", // or any other GPT-3.5 or GPT-4 model
+//   });
+//   assistant_id = assistantResponse.id;
+//   console.log(`Assistant ID: ${assistant_id}`);
+// }
+
+// createAssistant();
 
 
 // Endpoint to handle chat
+// app.post("/POST", async (req, res) => {
+//   try {
+//     if (!req.body.query) {
+//       return res.status(400).json({ error: "Message field is required" });
+//     }
+//     // const userMessage = req.body.query;
+//     const {query,Email}=req.body
+
+//     // Create a Thread
+//     const threadResponse = await openai.beta.threads.create();
+//     const threadId = threadResponse.id;
+
+//     // Add a Message to a Thread
+//     await openai.beta.threads.messages.create(threadId, {
+//       role: "user",
+//       content: query,
+//     });
+
+//     // Run the Assistant
+//     const runResponse = await openai.beta.threads.runs.create(threadId, {
+//       assistant_id: assistant_id,
+//     });
+
+//     // Check the Run status
+//     let run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
+//     while (run.status !== "completed") {
+//       await new Promise((resolve) => setTimeout(resolve, 1000));
+//       run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
+//     }
+
+//     // Display the Assistant's Response
+// const messagesResponse = await openai.beta.threads.messages.list(threadId);
+// const assistantResponses = messagesResponse.data.filter(msg => msg.role === 'assistant');
+// const response = assistantResponses.map(msg => 
+//   msg.content
+//     .filter(contentItem => contentItem.type === 'text')
+//     .map(textContent => textContent.text.value)
+//     .join('\n')
+// ).join('\n');
+//  const user = await Users.findOne({Email:Email})
+
+// if (!user) {
+//        //  return res.status(404).json({ message: 'User not found' });
+//        res.send(response+" history not save");
+//        console.log("user not found");
+//       }else{
+//           res.send(response)
+//           let answer=response;
+//           // Add the new chat object to the chats array
+//             user.chats.push({query,answer});
+        
+//             // Save the updated user document
+//             await user.save();
+
+//       }  
+          
+//   } catch (error) {
+//     console.error("Error processing chat:", error);
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// });
+
+
+// new asistant code end open ai 
+
+// new asistant code start gemini ai 
 app.post("/POST", async (req, res) => {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    systemInstruction: "your name is avaz ai voice assistant for gen-Z who assist user you developed by shakib and kamruddin for BSC IT final year project.  ",
+  });
+  
+  const generationConfig = {
+    temperature: 1,
+    topP: 0.95,
+    topK: 64,
+    maxOutputTokens: 8192,
+    responseMimeType: "text/plain",
+  };
+  
+  const safetySettings = [
+    {
+      category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+    {
+      category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+      threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    },
+  ];
+  
   try {
     if (!req.body.query) {
       return res.status(400).json({ error: "Message field is required" });
     }
     // const userMessage = req.body.query;
     const {query,Email}=req.body
-
-    // Create a Thread
-    const threadResponse = await openai.beta.threads.create();
-    const threadId = threadResponse.id;
-
-    // Add a Message to a Thread
-    await openai.beta.threads.messages.create(threadId, {
-      role: "user",
-      content: query,
+    const chatSession = model.startChat({
+      generationConfig,
+      safetySettings,
+      history: [
+      ],
     });
-
-    // Run the Assistant
-    const runResponse = await openai.beta.threads.runs.create(threadId, {
-      assistant_id: assistant_id,
-    });
-
-    // Check the Run status
-    let run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
-    while (run.status !== "completed") {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      run = await openai.beta.threads.runs.retrieve(threadId, runResponse.id);
-    }
-
-    // Display the Assistant's Response
-const messagesResponse = await openai.beta.threads.messages.list(threadId);
-const assistantResponses = messagesResponse.data.filter(msg => msg.role === 'assistant');
-const response = assistantResponses.map(msg => 
-  msg.content
-    .filter(contentItem => contentItem.type === 'text')
-    .map(textContent => textContent.text.value)
-    .join('\n')
-).join('\n');
+  
+    const result = await chatSession.sendMessage(query);
+    console.log(result.response.text());
+   
+const response = result.response.text();
  const user = await Users.findOne({Email:Email})
 
 if (!user) {
@@ -102,7 +299,9 @@ if (!user) {
 });
 
 
-// new asistant code end
+// new asistant code end gemini ai 
+
+
 
 
 // ओल्ड बाककेण्ड कोड स्टार्ट 
