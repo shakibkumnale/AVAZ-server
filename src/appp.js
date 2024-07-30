@@ -22,19 +22,52 @@ app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
 
-const apiKey = process.env.GEMINI_API_KEY;
+// const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = "AIzaSyBdcLXGMc0HO0S0VOhLj_ojrwrRKUIH44k";
 
 const genAI = new GoogleGenerativeAI(apiKey);
 const fileManager = new GoogleAIFileManager(apiKey);
 
 
 const upload = multer({ dest: 'uploads/' });
+// async function uploadToGemini(path, mimeType) {
+//   const uploadResult = await fileManager.uploadFile(path, {
+//     mimeType,
+//     displayName: path,
+//   });
+//   const file = uploadResult.file;
+//   return file;
+// }
+
+/**
+ * Waits for the given file to be active.
+ */
+// async function waitForFileActive(file) {
+//   console.log("Waiting for file processing...");
+//   let fileInfo = await fileManager.getFile(file.name);
+//   while (fileInfo.state === "PROCESSING") {
+//     process.stdout.write(".");
+//     await new Promise((resolve) => setTimeout(resolve, 10000));
+//     fileInfo = await fileManager.getFile(file.name);
+//   }
+//   if (fileInfo.state !== "ACTIVE") {
+//     throw new Error(`File ${file.name} failed to process`);
+//   }
+//   console.log("...file is ready\n");
+//   return fileInfo;
+// }
+
+/**
+ * Endpoint to handle file upload and proxy to Gemini.
+ */
+// start
 async function uploadToGemini(path, mimeType) {
   const uploadResult = await fileManager.uploadFile(path, {
     mimeType,
     displayName: path,
   });
   const file = uploadResult.file;
+  console.log(`Uploaded file ${file.displayName} as: ${file.name}`);
   return file;
 }
 
@@ -56,20 +89,19 @@ async function waitForFileActive(file) {
   return fileInfo;
 }
 
-/**
- * Endpoint to handle file upload and proxy to Gemini.
- */
-app.post('/upload', upload.single('video'), async (req, res) => {
+app.post('/upload-pdf', async (req, res) => {
   try {
-    const file = await uploadToGemini(req.file.path, req.file.mimetype);
+    const pdfPath = "A:/AVAZ-server/src/s3.pdf"; // Use forward slashes or double backslashes
+    const mimeType = "application/pdf";
+
+    const file = await uploadToGemini(pdfPath, mimeType);
     const activeFile = await waitForFileActive(file);
     res.status(200).json({ fileUri: activeFile.uri });
   } catch (error) {
+    console.error('Error uploading file:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
-
-app.use(express.json());
 
 app.post('/ask', async (req, res) => {
   const { fileUri, input } = req.body;
@@ -114,12 +146,17 @@ app.post('/ask', async (req, res) => {
         parts: [
           {
             fileData: {
-              mimeType: "video/mp4", // Adjust mimeType accordingly
+              mimeType: "application/pdf",
               fileUri: fileUri,
             },
           },
           {
             text: input,
+          },
+          {
+            text: "Please provide the answer following this format: \n" +
+                  "1. Start with 'Jai Bhim'.\n" 
+                  
           },
         ],
       },
@@ -128,14 +165,93 @@ app.post('/ask', async (req, res) => {
 
   try {
     const result = await chatSession.sendMessage(input);
-    res.send( result.response.text() );
-    console.log(result.response.text());
+   const s= await result.response.text()
+   console.log(s)
+    res.status(200).json({ answer: await result.response.text() });
   } catch (error) {
     console.error('Request:', { fileUri, input });
     console.error('Error:', error.response ? error.response.data : error.message);
     res.status(500).json({ error: error.message });
   }
 });
+
+// app.post('/upload', upload.single('video'), async (req, res) => {
+//   try {
+//     const file = await uploadToGemini(req.file.path, req.file.mimetype);
+//     const activeFile = await waitForFileActive(file);
+//     res.status(200).json({ fileUri: activeFile.uri });
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+
+app.use(express.json());
+
+// app.post('/ask', async (req, res) => {
+//   const { fileUri, input } = req.body;
+
+//   const model = genAI.getGenerativeModel({
+//     model: "gemini-1.5-flash",
+//   });
+
+//   const generationConfig = {
+//     temperature: 1,
+//     topP: 0.95,
+//     topK: 64,
+//     maxOutputTokens: 8192,
+//     responseMimeType: "text/plain",
+//   };
+
+//   const safetySettings = [
+//     {
+//       category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+//       threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+//     },
+//     {
+//       category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+//       threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+//     },
+//     {
+//       category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+//       threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+//     },
+//     {
+//       category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+//       threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+//     },
+//   ];
+
+//   const chatSession = model.startChat({
+//     generationConfig,
+//     safetySettings,
+//     history: [
+//       {
+//         role: "user",
+//         parts: [
+//           {
+//             fileData: {
+//               mimeType: "video/mp4", // Adjust mimeType accordingly
+//               fileUri: fileUri,
+//             },
+//           },
+//           {
+//             text: input,
+//           },
+//         ],
+//       },
+//     ],
+//   });
+
+//   try {
+//     const result = await chatSession.sendMessage(input);
+//     res.send( result.response.text() );
+//     console.log(result.response.text());
+//   } catch (error) {
+//     console.error('Request:', { fileUri, input });
+//     console.error('Error:', error.response ? error.response.data : error.message);
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 // end the video ask
 // new asistant code start
 // const apiKey = process.env.OPENAI_API_KEY;
